@@ -1,0 +1,448 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Applicant Apple (Final)</title>
+    <meta name="theme-color" content="#28a745">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍎</text></svg>">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        :root { --bg: #f4f7f6; --card: #ffffff; --text: #333; --primary: #28a745; --blue: #007bff; --danger: #dc3545; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; }
+        
+        /* LOGIN OVERLAY */
+        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 999; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
+        .login-box { width: 100%; max-width: 320px; text-align: center; }
+        
+        .input-group { position: relative; width: 100%; margin-bottom: 10px; }
+        .login-input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        .eye-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 18px; color: #666; }
+        .auth-toggle { margin-top: 15px; font-size: 14px; color: #555; }
+        .auth-link { color: var(--blue); cursor: pointer; font-weight: bold; text-decoration: underline; }
+        .forgot-link { display: block; margin-bottom: 15px; color: var(--danger); font-size: 13px; cursor: pointer; text-decoration: none; text-align: right; width: 100%; }
+        /* APP UI */
+        .app-header { background: var(--primary); padding: 15px; color: white; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .container { max-width: 500px; margin: 0 auto; padding: 15px; padding-bottom: 80px; }
+        .card { background: var(--card); padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 15px; }
+        
+        input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; box-sizing: border-box; outline:none; }
+        .row { display: flex; gap: 10px; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; color: white; transition: 0.2s; }
+        .btn:active { transform: scale(0.98); }
+        .btn-green { background: var(--primary); }
+        .btn-blue { background: var(--blue); }
+        
+        .expense-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
+        .badge { background: #e9ecef; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; color: #555; }
+        .action-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 5px; }
+        
+        #settleModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 200; justify-content: center; align-items: center; padding: 20px; }
+        .modal-content { background: white; padding: 20px; border-radius: 15px; width: 100%; max-width: 400px; max-height: 80vh; overflow-y: auto; position: relative; }
+        .close-modal { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: #888; }
+        .settle-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; align-items: center; }
+        .positive { color: var(--primary); font-weight: bold; } 
+        .negative { color: var(--danger); font-weight: bold; }
+        
+        .wa-btn { background: #25D366; color: white; border: none; padding: 5px 10px; border-radius: 5px; font-size: 12px; cursor: pointer; margin-left: 5px; text-decoration: none; display: inline-block; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #28a745; border-radius: 50%; width: 25px; height: 25px; animation: spin 1s linear infinite; margin: 0 auto; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+<div id="loginOverlay">
+    <div class="login-box">
+        <h1 style="color:#28a745; margin-bottom:5px;">🍎 Applicant Apple</h1>
+        <p style="color:#666; margin-bottom:20px;" id="authTitle">Login to Account</p>
+        
+        <div class="input-group">
+            <input type="email" id="emailInput" class="login-input" placeholder="Email Address">
+        </div>
+        
+        <div class="input-group">
+            <input type="password" id="passInput" class="login-input" placeholder="Password">
+            <span class="eye-icon" onclick="togglePasswordDisplay()">👁️</span>
+        </div>
+        <span class="forgot-link" id="forgotLink" onclick="handleForgotPassword()">Forgot Password?</span>
+        <div class="loader" id="loginLoader"></div>
+        <p id="errorMsg" style="color:red; font-size:12px; margin-bottom:10px; display:none;"></p>
+        <button class="btn btn-green" id="authBtn" onclick="handleAuth()">Login</button>
+        
+        <div class="auth-toggle">
+            <span id="toggleText">New here? </span>
+            <span class="auth-link" id="toggleLink" onclick="switchMode()">Create Account</span>
+        </div>
+    </div>
+</div>
+<div id="mainApp" style="display:none;">
+    <div class="app-header">
+        <h3 style="margin:0;">🍎 Tracker</h3>
+        <div>
+            <button onclick="showSettlement()" style="background:none; border:1px solid white; color:white; border-radius:4px; cursor:pointer; padding:5px 10px; margin-right:5px;">⚖️ Hisab</button>
+            <button onclick="handleLogout()" style="background:none; border:none; font-size:18px; cursor:pointer;">🚪</button>
+        </div>
+    </div>
+    <div class="container">
+        <div class="card" style="text-align:center; background: linear-gradient(135deg, #28a745, #218838); color: white;">
+            <span style="opacity:0.9; font-size:13px;">Total Group Expense</span>
+            <h1 style="margin:5px 0;" id="mainTotal">₹0</h1>
+            <div style="margin-top:10px;">
+                <button onclick="downloadPDF()" style="background:white; color:#28a745; border:none; padding:5px 10px; border-radius:15px; font-size:12px; cursor:pointer; font-weight:bold;">⬇ PDF</button>
+                <button onclick="shareAllWA()" style="background:white; color:#25D366; border:none; padding:5px 10px; border-radius:15px; font-size:12px; cursor:pointer; font-weight:bold;">💬 WhatsApp</button>
+            </div>
+        </div>
+        <div class="card">
+            <div class="row">
+                <select id="personSelect"><option>Loading...</option></select>
+                <input type="text" id="foodName" placeholder="Item Name">
+            </div>
+            <div class="row">
+                <input type="number" id="foodCost" placeholder="Amount (₹)">
+                <button class="btn btn-green" id="actionBtn" onclick="handleAction()">+ Add</button>
+            </div>
+            <div id="editCancelBlock" style="display:none; text-align:center; margin-top:5px;">
+                <span onclick="cancelEdit()" style="color:#dc3545; font-size:12px; cursor:pointer; text-decoration:underline;">Cancel Edit</span>
+            </div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h4 style="margin:0; color:#555;">Recent Entries</h4>
+            <span onclick="addNewMember()" style="color:#007bff; font-size:12px; cursor:pointer;">+ New Member</span>
+        </div>
+        
+        <div id="expenseList">Loading...</div>
+    </div>
+</div>
+<div id="settleModal">
+    <div class="modal-content">
+        <span class="close-modal" onclick="document.getElementById('settleModal').style.display='none'">&times;</span>
+        <h3 style="margin-top:0;">⚖️ Final Settlement</h3>
+        <p style="font-size:12px; color:#666;">Per Person Share: <strong id="perHeadShare">₹0</strong></p>
+        <button onclick="shareSettlementWA()" style="width:100%; background:#25D366; color:white; border:none; padding:10px; border-radius:5px; font-weight:bold; margin-bottom:15px;">💬 Share Summary</button>
+        <div id="settlementList"></div>
+    </div>
+</div>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, get, onValue, push, remove, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    // ✅ CORRECTED CONFIGURATION
+    const firebaseConfig = {
+        apiKey: "AIzaSyDaZCVNxKrj7X5XuTTgR3iIjd-EyuVU-6E",
+        authDomain: "appe1-d1aed.firebaseapp.com",
+        projectId: "appe1-d1aed",
+        storageBucket: "appe1-d1aed.firebasestorage.app",
+        messagingSenderId: "125870521756",
+        appId: "1:125870521756:web:c5537cc6ff9dc5b0051c59",
+        measurementId: "G-JNTGHXZQ9D"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const auth = getAuth(app);
+    let appData = { users: [], expenses: {} };
+    let editKey = null;
+    let isLogin = true;
+    // --- AUTH UI TOGGLE ---
+    window.switchMode = () => {
+        isLogin = !isLogin;
+        const title = document.getElementById('authTitle');
+        const btn = document.getElementById('authBtn');
+        const tText = document.getElementById('toggleText');
+        const tLink = document.getElementById('toggleLink');
+        const forgot = document.getElementById('forgotLink');
+        const errorMsg = document.getElementById('errorMsg');
+        
+        errorMsg.style.display = 'none';
+        
+        if(isLogin) {
+            title.innerText = "Login to Account";
+            btn.innerText = "Login";
+            btn.classList.remove('btn-blue'); btn.classList.add('btn-green');
+            tText.innerText = "New here? ";
+            tLink.innerText = "Create Account";
+            forgot.style.display = 'block';
+        } else {
+            title.innerText = "Register New Account";
+            btn.innerText = "Sign Up";
+            btn.classList.remove('btn-green'); btn.classList.add('btn-blue');
+            tText.innerText = "Have an account? ";
+            tLink.innerText = "Login";
+            forgot.style.display = 'none';
+        }
+    }
+    window.togglePasswordDisplay = () => {
+        const pass = document.getElementById('passInput');
+        const icon = document.querySelector('.eye-icon');
+        pass.type = pass.type === "password" ? "text" : "password";
+        icon.innerText = pass.type === "password" ? "👁️" : "🙈";
+    }
+    // --- AUTH LOGIC ---
+    window.handleAuth = async () => {
+        const email = document.getElementById('emailInput').value;
+        const pass = document.getElementById('passInput').value;
+        const loader = document.getElementById('loginLoader');
+        const errorMsg = document.getElementById('errorMsg');
+        if(!email || !pass) {
+            errorMsg.innerText = "Please fill all fields.";
+            errorMsg.style.display = 'block';
+            return;
+        }
+        loader.style.display = 'block';
+        errorMsg.style.display = 'none';
+        try {
+            if(isLogin) {
+                // Login
+                await signInWithEmailAndPassword(auth, email, pass);
+            } else {
+                // Register
+                await createUserWithEmailAndPassword(auth, email, pass);
+                
+                // ✅ FIX: Check if data exists BEFORE creating, to avoid deleting other people's data
+                const dbRef = ref(db, 'groups/main');
+                const snapshot = await get(dbRef);
+                
+                if (!snapshot.exists()) {
+                    await set(ref(db, 'groups/main'), { users: [], expenses: {} });
+                }
+            }
+        } catch (error) {
+            console.error(error); // For debugging
+            let msg = error.message;
+            if(error.code === 'auth/wrong-password') msg = "Incorrect Password.";
+            if(error.code === 'auth/user-not-found') msg = "User not found. Please Sign Up.";
+            if(error.code === 'auth/email-already-in-use') msg = "Email already used. Please Login.";
+            if(error.code === 'auth/invalid-credential') msg = "Invalid Email or Password.";
+            if(error.code === 'auth/weak-password') msg = "Password should be at least 6 characters.";
+            
+            errorMsg.innerText = msg;
+            errorMsg.style.display = 'block';
+        }
+        loader.style.display = 'none';
+    }
+    window.handleForgotPassword = async () => {
+        const email = document.getElementById('emailInput').value;
+        if(!email) {
+            alert("Please enter your email in the box first.");
+            return;
+        }
+        try {
+            await sendPasswordResetEmail(auth, email);
+            alert("✅ Reset link sent to " + email);
+        } catch (e) {
+            alert("Error: " + e.message);
+        }
+    }
+    window.handleLogout = () => signOut(auth);
+    onAuthStateChanged(auth, u => {
+        document.getElementById('loginOverlay').style.display = u ? 'none' : 'flex';
+        document.getElementById('mainApp').style.display = u ? 'block' : 'none';
+        if(u) startSync();
+    });
+    // --- SYNC & APP ---
+    function startSync() {
+        onValue(ref(db, 'groups/main'), (snap) => {
+            const val = snap.val();
+            if(val) {
+                appData = val;
+                if(!appData.users) appData.users = [];
+                if(!appData.expenses) appData.expenses = {};
+                renderUI();
+            } else {
+                // Initial empty state if needed
+                appData = { users: [], expenses: {} };
+                renderUI();
+            }
+        });
+    }
+    window.handleAction = () => {
+        const person = document.getElementById('personSelect').value;
+        const name = document.getElementById('foodName').value;
+        const cost = parseFloat(document.getElementById('foodCost').value);
+        
+        if(!name || isNaN(cost)) return alert("Invalid details");
+        if (person === "" || person === "Add Member First" || person === "Loading...") {
+            return alert("Please add a member first!");
+        }
+        if(editKey) {
+            update(ref(db, `groups/main/expenses/${editKey}`), { person, name, cost });
+            cancelEdit();
+        } else {
+            push(ref(db, 'groups/main/expenses'), { person, name, cost, timestamp: Date.now() });
+        }
+        document.getElementById('foodName').value = '';
+        document.getElementById('foodCost').value = '';
+    }
+    window.startEdit = (key, person, name, cost) => {
+        editKey = key;
+        document.getElementById('personSelect').value = person;
+        document.getElementById('foodName').value = name;
+        document.getElementById('foodCost').value = cost;
+        const btn = document.getElementById('actionBtn');
+        btn.innerText = "Update Entry";
+        btn.classList.remove('btn-green'); btn.classList.add('btn-blue');
+        document.getElementById('editCancelBlock').style.display = 'block';
+        window.scrollTo({top:0, behavior:'smooth'});
+    }
+    window.cancelEdit = () => {
+        editKey = null;
+        document.getElementById('foodName').value = '';
+        document.getElementById('foodCost').value = '';
+        const btn = document.getElementById('actionBtn');
+        btn.innerText = "+ Add";
+        btn.classList.remove('btn-blue'); btn.classList.add('btn-green');
+        document.getElementById('editCancelBlock').style.display = 'none';
+    }
+    window.deleteItem = (key) => { if(confirm("Delete this?")) remove(ref(db, `groups/main/expenses/${key}`)); }
+    
+    // 🟢 ADD MEMBER LOGIC
+    window.addNewMember = () => { 
+        const name = prompt("Enter Member Name:"); 
+        if(name) {
+            const currentUsers = appData.users || [];
+            // Basic duplication check
+            if(currentUsers.includes(name)) {
+                alert("Member already exists!");
+                return;
+            }
+            set(ref(db, 'groups/main/users'), [...currentUsers, name]); 
+        }
+    }
+    function renderUI() {
+        const select = document.getElementById('personSelect');
+        const oldVal = select.value;
+        select.innerHTML = '';
+        
+        // 🟢 HANDLE EMPTY USERS
+        if (appData.users && appData.users.length > 0) {
+            appData.users.forEach(u => select.innerHTML += `<option value="${u}">${u}</option>`);
+        } else {
+            select.innerHTML = '<option disabled selected>Add Member First</option>';
+        }
+        
+        if(appData.users && appData.users.includes(oldVal)) select.value = oldVal;
+        const list = document.getElementById('expenseList');
+        list.innerHTML = '';
+        let total = 0;
+        const arr = [];
+        for(let k in appData.expenses) arr.push({...appData.expenses[k], key: k});
+        arr.sort((a,b) => b.timestamp - a.timestamp);
+        
+        arr.forEach(exp => {
+            total += exp.cost;
+            list.innerHTML += `
+            <div class="expense-item">
+                <div>
+                    <strong>${exp.name}</strong> <span class="badge">${exp.person}</span><br>
+                    <small style="color:#888;">₹${exp.cost}</small>
+                </div>
+                <div>
+                    <button class="action-btn" style="color:#ffc107;" onclick="startEdit('${exp.key}','${exp.person}','${exp.name}',${exp.cost})">✎</button>
+                    <button class="action-btn" style="color:#dc3545;" onclick="deleteItem('${exp.key}')">🗑</button>
+                </div>
+            </div>`;
+        });
+        document.getElementById('mainTotal').innerText = `₹${total}`;
+    }
+    window.downloadPDF = () => {
+        if(!window.jspdf) return alert("Wait for internet to load PDF library");
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        doc.setFontSize(18);
+        doc.text("Applicant Apple - Expense Report", 14, 20);
+        
+        let total = document.getElementById('mainTotal').innerText;
+        doc.setFontSize(12);
+        doc.text(`Total Expense: ${total}`, 14, 30);
+        doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 36);
+        
+        const tableData = [];
+        const arr = [];
+        for(let k in appData.expenses) arr.push({...appData.expenses[k], key: k});
+        arr.sort((a,b) => b.timestamp - a.timestamp);
+        
+        arr.forEach(e => {
+            tableData.push([new Date(e.timestamp).toLocaleDateString(), e.person, e.name, e.cost]);
+        });
+        
+        doc.autoTable({ head: [['Date', 'Person', 'Item', 'Amount']], body: tableData, startY: 45, theme: 'grid' });
+        doc.save(`Mess_Report_${new Date().toISOString().slice(0,10)}.pdf`);
+    }
+    window.showSettlement = () => {
+        const expenses = Object.values(appData.expenses || {});
+        const users = appData.users || [];
+        
+        if (users.length === 0) {
+            alert("No members found. Please add members first.");
+            return;
+        }
+        let paidMap = {}; users.forEach(u => paidMap[u] = 0);
+        let total = 0;
+        
+        expenses.forEach(e => { 
+            if(paidMap[e.person] !== undefined) paidMap[e.person] += e.cost; 
+            total += e.cost; 
+        });
+        
+        const perHead = total / users.length || 0;
+        document.getElementById('perHeadShare').innerText = `₹${perHead.toFixed(0)}`;
+        
+        const list = document.getElementById('settlementList');
+        list.innerHTML = '';
+        
+        users.forEach(u => {
+            const paid = paidMap[u];
+            const diff = paid - perHead;
+            const status = diff >= 0 ? `Gets back ₹${diff.toFixed(0)}` : `Pays ₹${Math.abs(diff).toFixed(0)}`;
+            const color = diff >= 0 ? 'positive' : 'negative';
+            
+            const indText = `*Applicant Apple Report*\nUser: ${u}\nTotal Paid: ₹${paid}\nStatus: ${status}`;
+            const url = `https://wa.me/?text=${encodeURIComponent(indText)}`;
+            
+            list.innerHTML += `
+            <div class="settle-row">
+                <div><span>${u}</span><br><small style="color:#666;">Paid: ₹${paid}</small></div>
+                <div style="text-align:right;"><span class="${color}">${status}</span><br><a href="${url}" target="_blank" class="wa-btn">Share 💬</a></div>
+            </div>`;
+        });
+        document.getElementById('settleModal').style.display = 'flex';
+    }
+    window.shareSettlementWA = () => {
+        const expenses = Object.values(appData.expenses || {});
+        const users = appData.users || [];
+        
+        if (users.length === 0) return alert("No members.");
+        
+        let paidMap = {}; users.forEach(u => paidMap[u] = 0);
+        let total = 0;
+        
+        expenses.forEach(e => { 
+            if(paidMap[e.person] !== undefined) paidMap[e.person] += e.cost; 
+            total += e.cost; 
+        });
+        
+        const perHead = total / users.length;
+        let msg = `*🍎 Final Settlement Report*\nTotal Expense: ₹${total}\nPer Head: ₹${perHead.toFixed(0)}\n\n`;
+        
+        users.forEach(u => {
+            const diff = paidMap[u] - perHead;
+            const status = diff >= 0 ? `🟢 Gets ₹${diff.toFixed(0)}` : `🔴 Pays ₹${Math.abs(diff).toFixed(0)}`;
+            msg += `${u}: ${status}\n`;
+        });
+        
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    }
+    window.shareAllWA = () => {
+        let msg = `*🍎 Expense List*\n`;
+        const arr = [];
+        for(let k in appData.expenses) arr.push(appData.expenses[k]);
+        arr.sort((a,b) => b.timestamp - a.timestamp);
+        arr.forEach(e => { msg += `${e.person}: ${e.name} (₹${e.cost})\n`; });
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    }
+</script>
+</body>
+</html>
