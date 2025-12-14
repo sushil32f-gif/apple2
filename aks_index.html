@@ -1,0 +1,361 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Applicant Apple (Offline)</title>
+    <meta name="theme-color" content="#28a745">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        :root { --bg: #f4f7f6; --card: #ffffff; --text: #333; --primary: #28a745; --blue: #007bff; --danger: #dc3545; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; }
+        
+        /* LOGIN UI */
+        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 999; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
+        .login-box { width: 100%; max-width: 320px; text-align: center; }
+        .login-input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 10px; font-size: 16px; box-sizing: border-box; }
+        
+        /* APP HEADER */
+        .app-header { background: var(--primary); padding: 10px 15px; color: white; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .header-left { display: flex; align-items: center; gap: 8px; }
+        
+        /* PROFILE PIC (Header) - Fixed Visibility */
+        .header-pic-container { position: relative; width: 40px; height: 40px; }
+        .header-pic { width: 100%; height: 100%; border-radius: 50%; background: #fff; border: 2px solid #fff; object-fit: cover; cursor: pointer; }
+        
+        .container { max-width: 500px; margin: 0 auto; padding: 15px; padding-bottom: 80px; }
+        .card { background: var(--card); padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 15px; }
+        
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; color: white; transition:0.2s; }
+        .btn:active { transform:scale(0.98); }
+        .btn-green { background: var(--primary); }
+        .btn-blue { background: var(--blue); }
+        
+        .expense-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
+        .badge { background: #e9ecef; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; color: #555; }
+        
+        /* MODALS */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 200; justify-content: center; align-items: center; padding: 20px; }
+        .modal-content { background: white; padding: 20px; border-radius: 15px; width: 100%; max-width: 320px; position: relative; text-align: center; }
+        .close-btn { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: #888; }
+        .big-pic { width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--primary); object-fit: cover; margin-bottom: 10px; cursor: pointer; }
+        
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #28a745; border-radius: 50%; width: 25px; height: 25px; animation: spin 1s linear infinite; margin: 0 auto; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .conn-dot { width: 8px; height: 8px; background: orange; border-radius: 50%; display: inline-block; margin-right:5px; }
+    </style>
+</head>
+<body>
+<input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="handleFileSelect(event)">
+<div id="loginOverlay">
+    <div class="login-box">
+        <h1 style="color:#28a745; margin-bottom:5px;">🍎 Applicant Apple</h1>
+        <p style="color:#666; margin-bottom:20px;">Login to Account</p>
+        <input type="email" id="emailInput" class="login-input" placeholder="Email Address">
+        <input type="password" id="passInput" class="login-input" placeholder="Password">
+        <p id="errorMsg" style="color:red; font-size:12px; display:none;"></p>
+        <div class="loader" id="loginLoader"></div>
+        <button class="btn btn-green" id="authBtn" onclick="handleAuth()">Login</button>
+        <p style="margin-top:15px; font-size:13px; color:#007bff; cursor:pointer;" onclick="switchMode()" id="toggleLink">Create Account</p>
+    </div>
+</div>
+<div id="mainApp" style="display:none;">
+    <div class="app-header">
+        <div class="header-left">
+            <span style="font-size:24px;">🍎</span>
+            <h3 style="margin:0;">Tracker</h3>
+        </div>
+        <div class="header-pic-container" onclick="openProfileModal()">
+            <img src="https://cdn-icons-png.flaticon.com/512/847/847969.png" id="headerProfile" class="header-pic">
+        </div>
+    </div>
+    <div class="container">
+        <div style="text-align:center; font-size:11px; color:#888; margin-bottom:8px;">
+            <span id="connStatus" class="conn-dot"></span><span id="connText">Waiting for connection...</span>
+        </div>
+        <div class="card" style="text-align:center; background: linear-gradient(135deg, #28a745, #218838); color: white;">
+            <span style="opacity:0.9; font-size:13px;">Total Group Expense</span>
+            <h1 style="margin:5px 0;" id="mainTotal">₹0</h1>
+            <div style="margin-top:12px;">
+                <button onclick="downloadPDF()" style="background:white; color:#28a745; border:none; padding:6px 15px; border-radius:20px; font-size:12px; font-weight:bold; margin-right:5px;">⬇ PDF</button>
+                <button onclick="showSettlement()" style="background:white; color:#25D366; border:none; padding:6px 15px; border-radius:20px; font-size:12px; font-weight:bold;">⚖️ Hisab</button>
+            </div>
+        </div>
+        <div class="card">
+            <div style="display:flex; gap:10px;">
+                <select id="personSelect" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;"><option>Loading...</option></select>
+                <input type="text" id="foodName" placeholder="Item Name" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
+            </div>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <input type="number" id="foodCost" placeholder="Amount (₹)" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                <button class="btn btn-green" id="actionBtn" onclick="handleAction()">+ Add</button>
+            </div>
+            <div id="editCancelBlock" style="display:none; text-align:center; margin-top:5px;">
+                <span onclick="cancelEdit()" style="color:#dc3545; font-size:12px; cursor:pointer; text-decoration:underline;">Cancel Edit</span>
+            </div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h4 style="margin:0; color:#555;">Recent Entries</h4>
+            <span onclick="addNewMember()" style="color:#007bff; font-size:12px; cursor:pointer;">+ New Member</span>
+        </div>
+        <div id="expenseList">Loading entries...</div>
+    </div>
+</div>
+<div id="profileModal" class="modal-overlay">
+    <div class="modal-content">
+        <span class="close-btn" onclick="document.getElementById('profileModal').style.display='none'">&times;</span>
+        <h3 style="margin-top:0;">My Profile</h3>
+        <img src="https://cdn-icons-png.flaticon.com/512/847/847969.png" id="modalPic" class="big-pic" onclick="triggerFileUpload()">
+        <p style="font-size:10px; color:#888; margin-top:-5px;">(Tap photo to change)</p>
+        <p id="displayEmail" style="font-size:13px; color:#555; margin-bottom:15px;">Loading email...</p>
+        
+        <input type="text" id="profileName" placeholder="Your Nickname" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; margin-bottom:10px; text-align:center;">
+        
+        <button class="btn btn-green" onclick="saveProfile()">Save Profile</button>
+        <div style="margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
+            <button onclick="handleLogout()" style="background:none; border:none; color:#dc3545; font-weight:bold;">Log Out</button>
+        </div>
+    </div>
+</div>
+<div id="settleModal" class="modal-overlay">
+    <div class="modal-content" style="max-height:80vh; overflow-y:auto;">
+        <span class="close-btn" onclick="document.getElementById('settleModal').style.display='none'">&times;</span>
+        <h3 style="margin-top:0;">Final Settlement</h3>
+        <p>Per Head Share: <strong id="perHeadShare">₹0</strong></p>
+        <button onclick="shareSettlementWA()" class="btn btn-green" style="background:#25D366; margin-bottom:15px;">Share on WhatsApp</button>
+        <div id="settlementList"></div>
+    </div>
+</div>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, get, onValue, push, remove, update, enableOfflinePersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    // --- SERVICE WORKER REGISTRATION (Offline Capability) ---
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js')
+            .then(() => console.log("Offline Mode Enabled"))
+            .catch(err => console.log("SW Error:", err));
+    }
+    // INSTANT CHECK
+    if (localStorage.getItem('isLoggedIn') === 'true') {
+        document.getElementById('loginOverlay').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+    }
+    const firebaseConfig = {
+        apiKey: "AIzaSyDaZCVNxKrj7X5XuTTgR3iIjd-EyuVU-6E",
+        authDomain: "appe1-d1aed.firebaseapp.com",
+        projectId: "appe1-d1aed",
+        storageBucket: "appe1-d1aed.firebasestorage.app",
+        messagingSenderId: "125870521756",
+        appId: "1:125870521756:web:c5537cc6ff9dc5b0051c59",
+        measurementId: "G-JNTGHXZQ9D"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const auth = getAuth(app);
+    // ✅ ENABLE OFFLINE DATABASE (Magic Line)
+    enableOfflinePersistence(db).catch((err) => {
+        if (err.code == 'failed-precondition') {
+            console.log('Persistence failed: Multiple tabs open');
+        } else if (err.code == 'unimplemented') {
+            console.log('Persistence not supported by browser');
+        }
+    });
+    
+    let appData = { users: [], expenses: {} };
+    let currentUser = null;
+    let editKey = null;
+    let isLogin = true;
+    // --- PROFILE ---
+    window.openProfileModal = () => {
+        if(!currentUser) {
+             // Fallback if auth isn't ready but localstorage says yes
+             document.getElementById('displayEmail').innerText = "Syncing...";
+        } else {
+             document.getElementById('displayEmail').innerText = currentUser.email;
+             onValue(ref(db, `groups/main/profiles/${currentUser.uid}`), (snap) => {
+                const d = snap.val();
+                if(d) {
+                    document.getElementById('profileName').value = d.name || '';
+                    document.getElementById('modalPic').src = d.pic || "https://cdn-icons-png.flaticon.com/512/847/847969.png";
+                }
+            }, { onlyOnce: true });
+        }
+        document.getElementById('profileModal').style.display = 'flex';
+    }
+    window.triggerFileUpload = () => document.getElementById('fileInput').click();
+    window.handleFileSelect = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        if (file.size > 150000) return alert("Image too large! Use smaller image.");
+        const reader = new FileReader();
+        reader.onload = function(e) { document.getElementById('modalPic').src = e.target.result; };
+        reader.readAsDataURL(file);
+    };
+    window.saveProfile = () => {
+        const name = document.getElementById('profileName').value;
+        const pic = document.getElementById('modalPic').src;
+        if(currentUser) {
+            update(ref(db, `groups/main/profiles/${currentUser.uid}`), { name, pic })
+            .then(() => { alert("Saved!"); document.getElementById('profileModal').style.display = 'none'; })
+            .catch(() => alert("Saved locally (will sync when online)")); // Offline feedback
+        }
+    };
+    // --- AUTH ---
+    window.switchMode = () => {
+        isLogin = !isLogin;
+        document.getElementById('authBtn').innerText = isLogin ? "Login" : "Sign Up";
+        document.getElementById('toggleLink').innerText = isLogin ? "Create Account" : "Login";
+    }
+    window.handleAuth = async () => {
+        const email = document.getElementById('emailInput').value;
+        const pass = document.getElementById('passInput').value;
+        document.getElementById('loginLoader').style.display = 'block';
+        try {
+            if(isLogin) await signInWithEmailAndPassword(auth, email, pass);
+            else {
+                await createUserWithEmailAndPassword(auth, email, pass);
+                const s = await get(ref(db, 'groups/main'));
+                if(!s.exists()) await set(ref(db, 'groups/main'), { users: [], expenses: {} });
+            }
+            localStorage.setItem('isLoggedIn', 'true');
+        } catch (e) { alert(e.message); }
+        document.getElementById('loginLoader').style.display = 'none';
+    }
+    window.handleLogout = () => {
+        localStorage.removeItem('isLoggedIn');
+        signOut(auth);
+        document.getElementById('profileModal').style.display = 'none';
+    }
+    onAuthStateChanged(auth, user => {
+        if(user) {
+            currentUser = user;
+            localStorage.setItem('isLoggedIn', 'true');
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+            startSync(user.uid);
+        } else {
+            currentUser = null;
+            localStorage.removeItem('isLoggedIn');
+            document.getElementById('mainApp').style.display = 'none';
+            document.getElementById('loginOverlay').style.display = 'flex';
+        }
+    });
+    // --- SYNC ---
+    function startSync(uid) {
+        const statusDot = document.getElementById('connStatus');
+        const statusText = document.getElementById('connText');
+        // Monitor Connection State
+        const connectedRef = ref(db, ".info/connected");
+        onValue(connectedRef, (snap) => {
+            if (snap.val() === true) {
+                statusDot.style.background = '#28a745';
+                statusText.innerText = "Online";
+            } else {
+                statusDot.style.background = 'gray';
+                statusText.innerText = "Offline Mode";
+            }
+        });
+        // Sync Data (Works offline too due to persistence)
+        onValue(ref(db, 'groups/main'), (snap) => {
+            const val = snap.val();
+            if(val) { appData = val; renderUI(); }
+        });
+        // Sync Profile Pic
+        onValue(ref(db, `groups/main/profiles/${uid}`), (snap) => {
+            const d = snap.val();
+            if(d && d.pic) document.getElementById('headerProfile').src = d.pic;
+        });
+    }
+    // --- APP LOGIC ---
+    window.handleAction = () => {
+        const p = document.getElementById('personSelect').value;
+        const n = document.getElementById('foodName').value;
+        const c = parseFloat(document.getElementById('foodCost').value);
+        if(!n || isNaN(c)) return alert("Invalid");
+        
+        // Works offline automatically!
+        if(editKey) {
+            update(ref(db, `groups/main/expenses/${editKey}`), { person:p, name:n, cost:c });
+            cancelEdit();
+        } else {
+            push(ref(db, 'groups/main/expenses'), { person:p, name:n, cost:c, timestamp: Date.now() });
+        }
+        document.getElementById('foodName').value = ''; document.getElementById('foodCost').value = '';
+    }
+    window.startEdit = (k,p,n,c) => {
+        editKey = k;
+        document.getElementById('personSelect').value = p; document.getElementById('foodName').value = n; document.getElementById('foodCost').value = c;
+        document.getElementById('actionBtn').innerText = "Update";
+        document.getElementById('editCancelBlock').style.display = 'block';
+    }
+    window.cancelEdit = () => {
+        editKey = null;
+        document.getElementById('foodName').value = ''; document.getElementById('foodCost').value = '';
+        document.getElementById('actionBtn').innerText = "+ Add";
+        document.getElementById('editCancelBlock').style.display = 'none';
+    }
+    window.deleteItem = (k) => { if(confirm("Delete?")) remove(ref(db, `groups/main/expenses/${k}`)); }
+    
+    window.addNewMember = () => { 
+        const name = prompt("Enter Name:"); 
+        if(name) {
+            const u = appData.users || [];
+            if(!u.includes(name)) set(ref(db, 'groups/main/users'), [...u, name]);
+        }
+    }
+    function renderUI() {
+        const sel = document.getElementById('personSelect');
+        const old = sel.value; sel.innerHTML = '';
+        (appData.users || []).forEach(u => sel.innerHTML += `<option value="${u}">${u}</option>`);
+        if(old) sel.value = old;
+        const list = document.getElementById('expenseList'); list.innerHTML = '';
+        let total = 0;
+        const arr = Object.entries(appData.expenses || {}).map(([k,v])=>({...v, key:k})).sort((a,b)=>b.timestamp-a.timestamp);
+        
+        arr.forEach(e => {
+            total += e.cost;
+            list.innerHTML += `
+            <div class="expense-item">
+                <div><strong>${e.name}</strong> <span class="badge">${e.person}</span><br><small>₹${e.cost}</small></div>
+                <div><button onclick="startEdit('${e.key}','${e.person}','${e.name}',${e.cost})" style="border:none;background:none;">✏️</button>
+                <button onclick="deleteItem('${e.key}')" style="border:none;background:none;">🗑</button></div>
+            </div>`;
+        });
+        document.getElementById('mainTotal').innerText = `₹${total}`;
+    }
+    window.downloadPDF = () => {
+        if(!window.jspdf) return alert("Check Internet for PDF tool.");
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.text("Expense Report", 14, 20);
+        doc.text(`Total: ${document.getElementById('mainTotal').innerText}`, 14, 30);
+        const rows = Object.values(appData.expenses||{}).map(v=>[new Date(v.timestamp).toLocaleDateString(), v.person, v.name, v.cost]);
+        doc.autoTable({ head:[['Date','User','Item','Amt']], body:rows, startY:40 });
+        doc.save('report.pdf');
+    }
+    window.showSettlement = () => {
+        const u = appData.users||[];
+        if(!u.length) return alert("No members.");
+        let paid={}; u.forEach(x=>paid[x]=0);
+        let tot=0;
+        Object.values(appData.expenses||{}).forEach(e=>{ if(paid[e.person]!==undefined) paid[e.person]+=e.cost; tot+=e.cost; });
+        const avg = tot/u.length;
+        document.getElementById('perHeadShare').innerText = `₹${avg.toFixed(0)}`;
+        const div = document.getElementById('settlementList'); div.innerHTML='';
+        u.forEach(user => {
+            const diff = paid[user]-avg;
+            const status = diff>=0 ? `<span style="color:green">Gets ₹${diff.toFixed(0)}</span>` : `<span style="color:red">Pays ₹${Math.abs(diff).toFixed(0)}</span>`;
+            div.innerHTML += `<div style="display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #eee;"><span>${user}</span><span>${status}</span></div>`;
+        });
+        document.getElementById('settleModal').style.display='flex';
+    }
+    window.shareSettlementWA = () => window.open(`https://wa.me/?text=Check App`);
+</script>
+</body>
+</html>
